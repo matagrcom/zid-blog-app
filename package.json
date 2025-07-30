@@ -1,5 +1,5 @@
-{{
-  "name": "zid-blog",
+{
+  "name": "zid-blog-app",
   "version": "1.0.0",
   "description": "تطبيق مدونة لمتجر زد",
   "main": "server.js",
