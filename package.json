@@ -1,4 +1,5 @@
 {
+  "type": "module",
   "name": "zid-blog-app",
   "version": "1.0.0",
   "description": "تطبيق مدونة لمتجر زد",
