@@ -1,8 +1,8 @@
-require('dotenv').config();
-const express = require('express');
-const { createClient } = require('@supabase/supabase-js');
-const cors = require('cors');
-const fetch = require('node-fetch');
+import 'dotenv/config';
+import express from 'express';
+import { createClient } from '@supabase/supabase-js';
+import cors from 'cors';
+import fetch from 'node-fetch';
 
 const app = express();
 
@@ -49,7 +49,7 @@ app.get('/blog', async (req, res) => {
   res.send(html);
 });
 
-// 📥 إضافة مقال (سيستخدمه لوحة التحكم لاحقاً)
+// 📥 إضافة مقال
 app.post('/api/posts', async (req, res) => {
   const { title, content, store_id } = req.body;
 
