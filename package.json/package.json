@@ -1,0 +1,19 @@
+{
+  "name": "zid-blog",
+  "version": "1.0.0",
+  "description": "تطبيق مدونة لمتجر زد",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "dotenv": "^16.0.3",
+    "cors": "^2.8.5",
+    "supabase": "^2.37.0",
+    "node-fetch": "^3.3.2"
+  },
+  "engines": {
+    "node": "18.x"
+  }
+}
