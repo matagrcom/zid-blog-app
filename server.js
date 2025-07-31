@@ -1,4 +1,7 @@
-import 'dotenv/config';
+// تحميل المتغيرات البيئية
+import dotenv from 'dotenv';
+dotenv.config();
+
 import express from 'express';
 import { createClient } from '@supabase/supabase-js';
 import cors from 'cors';
@@ -6,25 +9,27 @@ import fetch from 'node-fetch';
 
 const app = express();
 
-// ✅ إعداد Supabase باستخدام متغيرات البيئة الصحيحة
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseKey) {
-  throw new Error('❌ Supabase URL and Key are required. تأكد من ضبط المتغيرات في Render.');
+// ✅ التحقق من المتغيرات البيئية
+if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
+  console.error('🛑 SUPABASE_URL أو SUPABASE_ANON_KEY غير مضبوطين!');
+  process.exit(1);
 }
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+// إعداد Supabase مع تمرير fetch
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_ANON_KEY,
+  { global: { fetch } }
+);
 
-// ✅ إعدادات Express
+// وسائط
 app.use(cors());
 app.use(express.json());
-app.use(express.static('public')); // لعرض صفحات HTML
 
-// 🗂️ اسم جدول المقالات
+// جدول المقالات
 const BLOG_TABLE = 'zid_blog_posts';
 
-// 🌐 الصفحة الرئيسية
+// 🌐 الجذر: رسالة ترحيب
 app.get('/', (req, res) => {
   res.send(`
     <h1>تطبيق مدونتي لمتجر زد</h1>
@@ -33,48 +38,52 @@ app.get('/', (req, res) => {
   `);
 });
 
-// 📝 عرض المدونة
+// 📝 عرض المقالات
 app.get('/blog', async (req, res) => {
   const { data, error } = await supabase
     .from(BLOG_TABLE)
-    .select('*')
+    .select('title, content, created_at')
     .order('created_at', { ascending: false });
 
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) {
+    console.error('❌ خطأ في جلب المقالات:', error);
+    return res.status(500).json({ error: 'فشل في جلب البيانات من Supabase' });
+  }
 
   const html = `
     <html>
     <head><title>مدونة متجرك</title></head>
-    <body>
+    <body style="font-family:Arial">
       <h1>مرحباً في مدونتنا</h1>
       ${data.length ? 
-        data.map(p => `<div><h3>${p.title}</h3><p>${p.content.substring(0, 100)}...</p></div><hr>`).join('') :
+        data.map(p => `
+          <div style="margin-bottom: 20px">
+            <h3>${p.title}</h3>
+            <p>${p.content.substring(0, 200)}...</p>
+            <small>${new Date(p.created_at).toLocaleDateString('ar-SA')}</small>
+            <hr>
+          </div>
+        `).join('') : 
         '<p>لا توجد مقالات بعد.</p>'}
     </body>
     </html>`;
-    
   res.send(html);
 });
 
-// ➕ إضافة مقال جديد
-app.post('/api/posts', async (req, res) => {
-  const { title, content, store_id } = req.body;
-
-  const { data, error } = await supabase
-    .from(BLOG_TABLE)
-    .insert([{ title, content, store_id, created_at: new Date() }]);
-
-  if (error) return res.status(500).json({ error: error.message });
-  res.json({ success: true, data });
-});
-
-// ✅ اختبار السيرفر
+// ✅ اختبار الاتصال
 app.get('/test', (req, res) => {
-  res.json({ status: 'working', time: new Date() });
+  res.json({ 
+    status: 'working', 
+    time: new Date(),
+    supabase_url: process.env.SUPABASE_URL?.includes('supabase.co') ? 'set' : 'missing',
+    supabase_key: process.env.SUPABASE_ANON_KEY ? 'set' : 'missing'
+  });
 });
 
-// 🚀 تشغيل الخادم
+// تشغيل السيرفر
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
-  console.log(`✅ الخادم يعمل على http://localhost:${port}`);
+  console.log(`🚀 الخادم يعمل على http://localhost:${port}`);
+  console.log('✅ SUPABASE_URL:', process.env.SUPABASE_URL);
+  console.log('✅ SUPABASE_ANON_KEY:', process.env.SUPABASE_ANON_KEY ? 'تم التحميل' : 'مفقود');
 });
