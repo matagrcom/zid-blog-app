@@ -5,7 +5,7 @@ dotenv.config();
 import express from 'express';
 import { createClient } from '@supabase/supabase-js';
 import cors from 'cors';
-import fetch from 'node-fetch';
+import { got } from 'got';
 
 const app = express();
 
@@ -15,11 +15,15 @@ if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
   process.exit(1);
 }
 
-// إعداد Supabase مع تمرير fetch
+// إعداد Supabase مع تمرير got كـ fetch
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_ANON_KEY,
-  { global: { fetch } }
+  {
+    global: {
+      fetch: got.extend({ decompress: true }).fetch
+    }
+  }
 );
 
 // وسائط
@@ -82,8 +86,8 @@ app.get('/test', (req, res) => {
 
 // تشغيل السيرفر
 const port = process.env.PORT || 3000;
-app.listen(port, () => {
-  console.log(`🚀 الخادم يعمل على http://localhost:${port}`);
+app.listen(port, '0.0.0.0', () => {
+  console.log(`🚀 الخادم يعمل على http://0.0.0.0:${port}`);
   console.log('✅ SUPABASE_URL:', process.env.SUPABASE_URL);
   console.log('✅ SUPABASE_ANON_KEY:', process.env.SUPABASE_ANON_KEY ? 'تم التحميل' : 'مفقود');
 });
