@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>لوحة تحكم المدونة</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f4f6f9;
+      padding: 20px;
+      margin: 0;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 0 15px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #2c3e50;
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    input, textarea, button {
+      width: 100%;
+      margin: 10px 0;
+      padding: 12px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 16px;
+      box-sizing: border-box;
+    }
+    button {
+      background: #28a745;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    button:hover {
+      background: #218838;
+    }
+    .post {
+      border: 1px solid #eee;
+      padding: 20px;
+      margin: 15px 0;
+      border-radius: 8px;
+      background: #fdfdfd;
+    }
+    .post h3 {
+      margin: 0 0 10px 0;
+      color: #2c3e50;
+    }
+    .post p {
+      margin: 10px 0;
+      line-height: 1.6;
+      color: #555;
+    }
+    .post small {
+      color: #888;
+      font-size: 14px;
+    }
+    .store-info {
+      text-align: center;
+      padding: 15px;
+      background: #e3f2fd;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      color: #1976d2;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📝 لوحة تحكم المدونة</h1>
+    <div id="storeInfo" class="store-info">
+      جاري تحميل بيانات المتجر...
+    </div>
+
+    <form id="postForm">
+      <input type="text" id="title" placeholder="عنوان المقالة" required />
+      <textarea id="content" rows="8" placeholder="اكتب محتوى المقالة هنا..." required></textarea>
+      <button type="submit">نشر المقالة</button>
+    </form>
+
+    <hr />
+
+    <h2>مقالاتك الحالية</h2>
+    <div id="postsList">جاري تحميل المقالات...</div>
+  </div>
+
+  <script>
+    // استخراج اسم المتجر من الرابط
+    const urlParams = new URLSearchParams(window.location.search);
+    const storeDomain = urlParams.get('store') || 'متجرك.zid.to';
+    document.getElementById('storeInfo').textContent = `المتجر: ${storeDomain}`;
+
+    const BLOG_API = '/api/posts';
+    const BLOG_DATA_API = '/blog-data';
+
+    // إضافة مقالة جديدة
+    document.getElementById('postForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const title = document.getElementById('title').value;
+      const content = document.getElementById('content').value;
+
+      const res = await fetch(BLOG_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          title, 
+          content, 
+          store_id: storeDomain 
+        })
+      });
+
+      if (res.ok) {
+        alert('تم نشر المقالة بنجاح!');
+        document.getElementById('postForm').reset();
+        loadPosts(); // إعادة تحميل القائمة
+      } else {
+        alert('فشل النشر، حاول مجددًا.');
+      }
+    });
+
+    // عرض المقالات
+    async function loadPosts() {
+      const res = await fetch(BLOG_DATA_API);
+      const posts = await res.json();
+      const list = document.getElementById('postsList');
+      
+      if (posts.length === 0) {
+        list.innerHTML = '<p>لا توجد مقالات بعد. ابدأ بنشر أول مقالة!</p>';
+        return;
+      }
+
+      list.innerHTML = posts.map(p => `
+        <div class="post">
+          <h3>${p.title}</h3>
+          <p>${p.content.substring(0, 200)}${p.content.length > 200 ? '...' : ''}</p>
+          <small>تاريخ النشر: ${new Date(p.created_at).toLocaleDateString('ar-SA')}</small>
+        </div>
+      `).join('');
+    }
+
+    // تحميل المقالات عند فتح الصفحة
+    loadPosts();
+  </script>
+</body>
+</html>

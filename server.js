@@ -33,6 +33,38 @@ app.use(express.json());
 // جدول المقالات
 const BLOG_TABLE = 'zid_blog_posts';
 
+// 🖥️ عرض لوحة التحكم
+app.get('/admin', (req, res) => {
+  res.sendFile(new URL('./admin.html', import.meta.url).pathname);
+});
+
+// 📊 عرض المقالات كـ JSON (للوحة التحكم)
+app.get('/blog-data', async (req, res) => {
+  const { data, error } = await supabase
+    .from(BLOG_TABLE)
+    .select('title, content, created_at')
+    .order('created_at', { ascending: false });
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+// 📥 إضافة مقالة
+app.post('/api/posts', async (req, res) => {
+  const { title, content, store_id } = req.body;
+
+  if (!title || !content || !store_id) {
+    return res.status(400).json({ error: 'الحقول title و content و store_id مطلوبة' });
+  }
+
+  const { data, error } = await supabase
+    .from(BLOG_TABLE)
+    .insert([{ title, content, store_id, created_at: new Date() }]);
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true, data });
+});
+
 // 🌐 الجذر: رسالة ترحيب
 app.get('/', (req, res) => {
   res.send(`
