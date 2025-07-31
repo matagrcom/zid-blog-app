@@ -6,18 +6,25 @@ import fetch from 'node-fetch';
 
 const app = express();
 
-// إعداد Supabase
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+// ✅ إعداد Supabase باستخدام متغيرات البيئة الصحيحة
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_ANON_KEY;
 
-// وسائط
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error('❌ Supabase URL and Key are required. تأكد من ضبط المتغيرات في Render.');
+}
+
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+// ✅ إعدادات Express
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public')); // لعرض صفحات HTML
 
-// جدول المقالات
+// 🗂️ اسم جدول المقالات
 const BLOG_TABLE = 'zid_blog_posts';
 
-// 🌐 الجذر: رسالة ترحيب
+// 🌐 الصفحة الرئيسية
 app.get('/', (req, res) => {
   res.send(`
     <h1>تطبيق مدونتي لمتجر زد</h1>
@@ -26,7 +33,7 @@ app.get('/', (req, res) => {
   `);
 });
 
-// 📝 عرض المقالات
+// 📝 عرض المدونة
 app.get('/blog', async (req, res) => {
   const { data, error } = await supabase
     .from(BLOG_TABLE)
@@ -41,15 +48,15 @@ app.get('/blog', async (req, res) => {
     <body>
       <h1>مرحباً في مدونتنا</h1>
       ${data.length ? 
-        data.map(p => `<div><h3>${p.title}</h3><p>${p.content.substring(0, 100)}...</p></div><hr>`)
-        .join('') : 
+        data.map(p => `<div><h3>${p.title}</h3><p>${p.content.substring(0, 100)}...</p></div><hr>`).join('') :
         '<p>لا توجد مقالات بعد.</p>'}
     </body>
     </html>`;
+    
   res.send(html);
 });
 
-// 📥 إضافة مقال
+// ➕ إضافة مقال جديد
 app.post('/api/posts', async (req, res) => {
   const { title, content, store_id } = req.body;
 
@@ -61,13 +68,13 @@ app.post('/api/posts', async (req, res) => {
   res.json({ success: true, data });
 });
 
-// ✅ اختبار الاتصال
+// ✅ اختبار السيرفر
 app.get('/test', (req, res) => {
   res.json({ status: 'working', time: new Date() });
 });
 
-// تشغيل السيرفر
+// 🚀 تشغيل الخادم
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
-  console.log(`🚀 الخادم يعمل على http://localhost:${port}`);
+  console.log(`✅ الخادم يعمل على http://localhost:${port}`);
 });
