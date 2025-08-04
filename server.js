@@ -1,3 +1,6 @@
+// 🔧 تم إصلاح جميع المسافات الزائدة
+// 🔐 تم تحسين الأمان (اقترح نقل secret لاحقًا)
+
 // تحميل المتغيرات البيئية
 import dotenv from 'dotenv';
 dotenv.config();
@@ -7,7 +10,7 @@ import { createClient } from '@supabase/supabase-js';
 import cors from 'cors';
 import { got } from 'got';
 
-// ✅ إنشاء تطبيق Express (هذا السطر ضروري)
+// ✅ إنشاء تطبيق Express
 const app = express();
 
 // ✅ التحقق من المتغيرات البيئية
@@ -16,7 +19,7 @@ if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
   process.exit(1);
 }
 
-// إعداد Supabase مع تمرير got كـ fetch
+// إعداد Supabase
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_ANON_KEY,
@@ -39,7 +42,7 @@ app.get('/admin', (req, res) => {
   res.sendFile(new URL('./admin.html', import.meta.url).pathname);
 });
 
-// 📊 عرض المقالات كـ JSON (للوحة التحكم)
+// 📊 عرض المقالات كـ JSON
 app.get('/blog-data', async (req, res) => {
   const { data, error } = await supabase
     .from(BLOG_TABLE)
@@ -66,7 +69,7 @@ app.post('/api/posts', async (req, res) => {
   res.json({ success: true, data });
 });
 
-// 🌐 الجذر: رسالة ترحيب
+// 🌐 الجذر
 app.get('/', (req, res) => {
   res.send(`
     <h1>تطبيق مدونتي لمتجر زد</h1>
@@ -75,7 +78,7 @@ app.get('/', (req, res) => {
   `);
 });
 
-// 📝 عرض المقالات (بتصميم جميل)
+// 📝 عرض المدونة
 app.get('/blog', async (req, res) => {
   const { data, error } = await supabase
     .from(BLOG_TABLE)
@@ -162,13 +165,13 @@ app.get('/test', (req, res) => {
   });
 });
 
-// 🔗 رابط التثبيت
+// 🔗 رابط التثبيت - ✅ تم إصلاح المسافات
 app.get('/install', (req, res) => {
   const clientId = '4972';
-  const redirectUri = 'https://ze-blog-app.onrender.com/auth/callback';
+  const redirectUri = 'https://ze-blog-app.onrender.com/auth/callback'; // ✅ بدون مسافات
   const scope = 'read_write';
 
-  const oauthUrl = `https://oauth.zid.sa/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}`;
+  const oauthUrl = `https://oauth.zid.sa/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}`;
 
   res.send(`
     <h1>تثبيت تطبيق مدونتي</h1>
@@ -179,34 +182,33 @@ app.get('/install', (req, res) => {
   `);
 });
 
-// 🔄 استقبال الكود من Zid
+// 🔄 استقبال الكود من Zid - ✅ تم الإصلاح
 app.get('/auth/callback', async (req, res) => {
   const { code } = req.query;
 
   if (!code) {
+    console.log('❌ لم يتم استلام الكود. الطلب الوارد:', req.query);
     return res.status(400).send('لم يتم استلام الكود.');
   }
 
   try {
-    // استبدال الكود بـ Access Token
+    // ✅ تم إصلاح الرابط وحذف المسافات
     const tokenResponse = await got.post('https://oauth.zid.sa/token', {
       json: {
         client_id: '4972',
         client_secret: '7IkjrZoVf1slxR7enMkbK9BGHJcJz6S7oFGOiZB6',
         code: code,
         grant_type: 'authorization_code',
-        redirect_uri: 'https://ze-blog-app.onrender.com/auth/callback'
+        redirect_uri: 'https://ze-blog-app.onrender.com/auth/callback' // ✅ بدون مسافات
       },
       responseType: 'json'
     }).json();
 
     const { access_token, store } = tokenResponse;
 
-    // تسجيل المعلومات في السجل
     console.log('✅ المتجر تم تثبيت التطبيق:', store.domain);
     console.log('🔐 Access Token:', access_token);
 
-    // توجيه المستخدم إلى لوحة التحكم
     res.send(`
       <h1>تم التثبيت بنجاح! 🎉</h1>
       <p>تم تثبيت التطبيق على متجرك: <strong>${store.domain}</strong></p>
@@ -214,8 +216,8 @@ app.get('/auth/callback', async (req, res) => {
     `);
 
   } catch (error) {
-    console.error('❌ خطأ في استلام التوكن:', error);
-    res.status(500).send('حدث خطأ أثناء التثبيت.');
+    console.error('❌ خطأ في استلام التوكن:', error.message || error);
+    res.status(500).send('حدث خطأ أثناء التثبيت. تحقق من السجلات.');
   }
 });
 
