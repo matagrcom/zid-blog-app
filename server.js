@@ -1,6 +1,3 @@
-// 🔧 تم إصلاح جميع المسافات الزائدة
-// 🔐 تم تحسين الأمان (اقترح نقل secret لاحقًا)
-
 // تحميل المتغيرات البيئية
 import dotenv from 'dotenv';
 dotenv.config();
@@ -165,13 +162,14 @@ app.get('/test', (req, res) => {
   });
 });
 
-// 🔗 رابط التثبيت - ✅ تم إصلاح المسافات
+// 🔗 رابط التثبيت - ✅ تم الإصلاح
 app.get('/install', (req, res) => {
   const clientId = '4972';
   const redirectUri = 'https://ze-blog-app.onrender.com/auth/callback'; // ✅ بدون مسافات
   const scope = 'read_write';
 
-  const oauthUrl = `https://oauth.zid.sa/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}`;
+  // ✅ الرابط الصحيح: accounts.zid.sa
+  const oauthUrl = `https://accounts.zid.sa/auth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}`;
 
   res.send(`
     <h1>تثبيت تطبيق مدونتي</h1>
@@ -193,7 +191,7 @@ app.get('/auth/callback', async (req, res) => {
 
   try {
     // ✅ تم إصلاح الرابط وحذف المسافات
-    const tokenResponse = await got.post('https://oauth.zid.sa/token', {
+    const tokenResponse = await got.post('https://accounts.zid.sa/auth/token', {
       json: {
         client_id: '4972',
         client_secret: '7IkjrZoVf1slxR7enMkbK9BGHJcJz6S7oFGOiZB6',
