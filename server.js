@@ -174,6 +174,18 @@ app.get('/install', (req, res) => {
   `);
 });
 
+// 🔐 تسجيل الدخول - توجيه إلى صفحة التفويض في زد
+app.get('/login', (req, res) => {
+  const clientId = '4972';
+  const redirectUri = 'https://ze-blog-app.onrender.com/auth/callback';
+  const scope = 'read_write';
+  const responseType = 'code';
+
+  const authUrl = `https://accounts.zid.sa/auth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=${responseType}&scope=${scope}`;
+
+  res.redirect(authUrl);
+});
+
 // 🔄 استقبال الكود من Zid وتبديله بتوكن
 app.get('/auth/callback', async (req, res) => {
   const { code } = req.query;
