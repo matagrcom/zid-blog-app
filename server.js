@@ -1,4 +1,4 @@
-// تحميل المتغيرات البيئية
+// server.js
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -6,71 +6,71 @@ import express from 'express';
 import { createClient } from '@supabase/supabase-js';
 import cors from 'cors';
 import got from 'got';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-// ✅ إنشاء تطبيق Express
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const app = express();
 
-// ✅ التحقق من المتغيرات البيئية
-if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
+const CLIENT_ID = '4972';
+const REDIRECT_URI = 'https://ze-blog-app.onrender.com/auth/callback';
+const CLIENT_SECRET = process.env.CLIENT_SECRET;
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
+const BLOG_TABLE = 'zid_blog_posts';
+
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   console.error('🛑 SUPABASE_URL أو SUPABASE_ANON_KEY غير مضبوطين!');
   process.exit(1);
 }
 
-// إعداد Supabase
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY
-);
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// وسائط
 app.use(cors());
 app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
 
-// جدول المقالات
-const BLOG_TABLE = 'zid_blog_posts';
-
-// 🖥️ عرض لوحة التحكم
-app.get('/admin', (req, res) => {
-  res.sendFile(new URL('./admin.html', import.meta.url).pathname);
-});
-
-// 📊 عرض المقالات كـ JSON
-app.get('/blog-data', async (req, res) => {
-  const { data, error } = await supabase
-    .from(BLOG_TABLE)
-    .select('title, content, created_at')
-    .order('created_at', { ascending: false });
-
-  if (error) return res.status(500).json({ error: error.message });
-  res.json(data);
-});
-
-// 📥 إضافة مقالة
-app.post('/api/posts', async (req, res) => {
-  const { title, content, store_id } = req.body;
-
-  if (!title || !content || !store_id) {
-    return res.status(400).json({ error: 'الحقول title و content و store_id مطلوبة' });
-  }
-
-  const { data, error } = await supabase
-    .from(BLOG_TABLE)
-    .insert([{ title, content, store_id, created_at: new Date() }]);
-
-  if (error) return res.status(500).json({ error: error.message });
-  res.json({ success: true, data });
-});
-
-// 🌐 الجذر
-app.get('/', (req, res) => {
+// صفحة التثبيت
+app.get('/install', (req, res) => {
+  const authUrl = `https://oauth.zid.sa/oauth/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=read_write`;
   res.send(`
-    <h1>تطبيق مدونتي لمتجر زد</h1>
-    <p>جاهز للعمل! 🚀</p>
-    <a href="/blog">عرض المدونة</a>
+    <h2>تثبيت تطبيق مدونتي</h2>
+    <p>اضغط على الزر أدناه لبدء التثبيت:</p>
+    <a href="${authUrl}"><button>تثبيت التطبيق</button></a>
   `);
 });
 
-// 📝 عرض المدونة
+// استقبال كود التفويض
+app.get('/auth/callback', async (req, res) => {
+  const { code } = req.query;
+  if (!code) return res.send('❌ لم يتم العثور على كود التفويض');
+
+  try {
+    const tokenRes = await got.post('https://oauth.zid.sa/oauth/token', {
+      form: {
+        grant_type: 'authorization_code',
+        client_id: CLIENT_ID,
+        client_secret: CLIENT_SECRET,
+        code,
+        redirect_uri: REDIRECT_URI
+      },
+      responseType: 'json'
+    });
+
+    const { access_token, store_hash } = tokenRes.body;
+    console.log('✅ Access Token:', access_token);
+    console.log('🏪 Store Hash:', store_hash);
+
+    res.send('<h3>✅ تم التثبيت بنجاح! يمكنك الآن استخدام التطبيق.</h3>');
+  } catch (err) {
+    console.error('❌ خطأ أثناء طلب التوكن:', err.response?.body || err.message);
+    res.send('<h3>❌ حدث خطأ أثناء التثبيت. تحقق من السجلات.</h3>');
+  }
+});
+
+// عرض المقالات
 app.get('/blog', async (req, res) => {
   const { data, error } = await supabase
     .from(BLOG_TABLE)
@@ -147,85 +147,34 @@ app.get('/blog', async (req, res) => {
   res.send(html);
 });
 
-// ✅ اختبار الاتصال
-app.get('/test', (req, res) => {
-  res.json({
-    status: 'working',
-    time: new Date(),
-    supabase_url: process.env.SUPABASE_URL?.includes('supabase.co') ? 'set' : 'missing',
-    supabase_key: process.env.SUPABASE_ANON_KEY ? 'set' : 'missing'
-  });
+// إضافة مقالة
+app.post('/api/posts', async (req, res) => {
+  const { title, content, store_id } = req.body;
+  if (!title || !content || !store_id) {
+    return res.status(400).json({ error: 'الحقول title و content و store_id مطلوبة' });
+  }
+
+  const { data, error } = await supabase
+    .from(BLOG_TABLE)
+    .insert([{ title, content, store_id, created_at: new Date() }]);
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true, data });
 });
 
-// 🔗 رابط التثبيت
-app.get('/install', (req, res) => {
-  const clientId = '4972';
-  const redirectUri = 'https://ze-blog-app.onrender.com/auth/callback';
-  const scope = 'read_write';
-
-  const oauthUrl = `https://oauth.zid.sa/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}`;
-
+// الصفحة الرئيسية
+app.get('/', (req, res) => {
   res.send(`
-    <h1>تثبيت تطبيق مدونتي</h1>
-    <p>اضغط على الزر أدناه لبدء التثبيت:</p>
-    <a href="${oauthUrl}">
-      <button style="padding:10px 20px; font-size:16px;">تثبيت التطبيق</button>
-    </a>
+    <h1>تطبيق مدونتي لمتجر زد</h1>
+    <p>جاهز للعمل! 🚀</p>
+    <a href="/blog">عرض المدونة</a>
   `);
 });
 
-// 🔐 تسجيل الدخول - توجيه إلى صفحة التفويض في زد
-app.get('/login', (req, res) => {
-  const clientId = '4972';
-  const redirectUri = 'https://ze-blog-app.onrender.com/auth/callback';
-  const scope = 'read_write';
-  const responseType = 'code';
-
-  const authUrl = `https://accounts.zid.sa/auth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=${responseType}&scope=${scope}`;
-
-  res.redirect(authUrl);
-});
-
-// 🔄 استقبال الكود من Zid وتبديله بتوكن
-app.get('/auth/callback', async (req, res) => {
-  const { code } = req.query;
-
-  if (!code) {
-    console.log('❌ لم يتم استلام الكود. الطلب الوارد:', req.query);
-    return res.status(400).send('لم يتم استلام الكود.');
-  }
-
-  try {
-    const tokenResponse = await got.post('https://oauth.zid.sa/oauth/token', {
-      form: {
-        client_id: '4972',
-        client_secret: '7IkjrZoVf1slxR7enMkbK9BGHJCz6S7oFGOiZB6',
-        code: code,
-        grant_type: 'authorization_code',
-        redirect_uri: 'https://ze-blog-app.onrender.com/auth/callback'
-      },
-      responseType: 'json'
-    });
-
-    const { access_token, refresh_token, expires_in } = tokenResponse.body;
-
-    res.send(`
-      <h1>تم التثبيت بنجاح! 🎉</h1>
-      <p>Access Token: <code>${access_token}</code></p>
-      <p>Refresh Token: <code>${refresh_token}</code></p>
-      <p>Expires In: ${expires_in} seconds</p>
-    `);
-
-  } catch (error) {
-    console.error('❌ خطأ في استلام التوكن:', error.response?.body || error.message);
-    res.status(500).send('حدث خطأ أثناء التثبيت. تحقق من السجلات.');
-  }
-});
-
-// 🚀 تشغيل السيرفر
-const port = process.env.PORT || 3000;
-app.listen(port, '0.0.0.0', () => {
-  console.log(`🚀 الخادم يعمل على http://0.0.0.0:${port}`);
-  console.log('✅ SUPABASE_URL:', process.env.SUPABASE_URL);
-  console.log('✅ SUPABASE_ANON_KEY:', process.env.SUPABASE_ANON_KEY ? 'تم التحميل' : 'مفقود');
+// تشغيل الخادم
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 الخادم يعمل على http://0.0.0.0:${PORT}`);
+  console.log('✅ SUPABASE_URL:', SUPABASE_URL);
+  console.log('✅ SUPABASE_ANON_KEY:', SUPABASE_ANON_KEY ? 'تم التحميل' : 'مفقود');
 });
