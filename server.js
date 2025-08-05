@@ -154,21 +154,21 @@ app.get('/blog', async (req, res) => {
 
 // ✅ اختبار الاتصال
 app.get('/test', (req, res) => {
-  res.json({ 
-    status: 'working', 
+  res.json({
+    status: 'working',
     time: new Date(),
     supabase_url: process.env.SUPABASE_URL?.includes('supabase.co') ? 'set' : 'missing',
     supabase_key: process.env.SUPABASE_ANON_KEY ? 'set' : 'missing'
   });
 });
 
-// 🔗 رابط التثبيت - ✅ تم التعديل على رابط OAuth
+// 🔗 رابط التثبيت
 app.get('/install', (req, res) => {
   const clientId = '4972';
   const redirectUri = 'https://ze-blog-app.onrender.com/auth/callback';
   const scope = 'read_write';
 
-  const oauthUrl = `https://oauth.zid.sa/auth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}`;
+  const oauthUrl = `https://accounts.zid.sa/auth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}`;
 
   res.send(`
     <h1>تثبيت تطبيق مدونتي</h1>
@@ -179,7 +179,7 @@ app.get('/install', (req, res) => {
   `);
 });
 
-// 🔄 استقبال الكود من Zid - ✅ تم التعديل على رابط OAuth
+// 🔄 استقبال الكود من Zid
 app.get('/auth/callback', async (req, res) => {
   const { code } = req.query;
 
@@ -189,7 +189,7 @@ app.get('/auth/callback', async (req, res) => {
   }
 
   try {
-    const tokenResponse = await got.post('https://oauth.zid.sa/auth/token', {
+    const tokenResponse = await got.post('https://accounts.zid.sa/auth/token', {
       json: {
         client_id: '4972',
         client_secret: '7IkjrZoVf1slxR7enMkbK9BGHJcJz6S7oFGOiZB6',
@@ -208,3 +208,19 @@ app.get('/auth/callback', async (req, res) => {
     res.send(`
       <h1>تم التثبيت بنجاح! 🎉</h1>
       <p>تم تثبيت التطبيق على متجرك: <strong>${store.domain}</strong></p>
+      <a href="/admin?store=${store.domain}">ادخل إلى لوحة التحكم</a>
+    `);
+
+  } catch (error) {
+    console.error('❌ خطأ في استلام التوكن:', error.message || error);
+    res.status(500).send('حدث خطأ أثناء التثبيت. تحقق من السجلات.');
+  }
+});
+
+// 🚀 تشغيل السيرفر
+const port = process.env.PORT || 3000;
+app.listen(port, '0.0.0.0', () => {
+  console.log(`🚀 الخادم يعمل على http://0.0.0.0:${port}`);
+  console.log('✅ SUPABASE_URL:', process.env.SUPABASE_URL);
+  console.log('✅ SUPABASE_ANON_KEY:', process.env.SUPABASE_ANON_KEY ? 'تم التحميل' : 'مفقود');
+});
