@@ -5,7 +5,7 @@ dotenv.config();
 import express from 'express';
 import { createClient } from '@supabase/supabase-js';
 import cors from 'cors';
-import { got } from 'got';
+import got from 'got';
 
 // ✅ إنشاء تطبيق Express
 const app = express();
@@ -19,12 +19,7 @@ if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
 // إعداد Supabase
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY,
-  {
-    global: {
-      fetch: got.extend({ decompress: true }).fetch
-    }
-  }
+  process.env.SUPABASE_ANON_KEY
 );
 
 // وسائط
@@ -168,7 +163,7 @@ app.get('/install', (req, res) => {
   const redirectUri = 'https://ze-blog-app.onrender.com/auth/callback';
   const scope = 'read_write';
 
-  const oauthUrl = `https://accounts.zid.sa/auth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}`;
+  const oauthUrl = `https://oauth.zid.sa/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}`;
 
   res.send(`
     <h1>تثبيت تطبيق مدونتي</h1>
@@ -179,7 +174,7 @@ app.get('/install', (req, res) => {
   `);
 });
 
-// 🔄 استقبال الكود من Zid
+// 🔄 استقبال الكود من Zid وتبديله بتوكن
 app.get('/auth/callback', async (req, res) => {
   const { code } = req.query;
 
@@ -189,30 +184,28 @@ app.get('/auth/callback', async (req, res) => {
   }
 
   try {
-    const tokenResponse = await got.post('https://accounts.zid.sa/auth/token', {
-      json: {
+    const tokenResponse = await got.post('https://oauth.zid.sa/oauth/token', {
+      form: {
         client_id: '4972',
-        client_secret: '7IkjrZoVf1slxR7enMkbK9BGHJcJz6S7oFGOiZB6',
+        client_secret: '7IkjrZoVf1slxR7enMkbK9BGHJCz6S7oFGOiZB6',
         code: code,
         grant_type: 'authorization_code',
         redirect_uri: 'https://ze-blog-app.onrender.com/auth/callback'
       },
       responseType: 'json'
-    }).json();
+    });
 
-    const { access_token, store } = tokenResponse;
-
-    console.log('✅ المتجر تم تثبيت التطبيق:', store.domain);
-    console.log('🔐 Access Token:', access_token);
+    const { access_token, refresh_token, expires_in } = tokenResponse.body;
 
     res.send(`
       <h1>تم التثبيت بنجاح! 🎉</h1>
-      <p>تم تثبيت التطبيق على متجرك: <strong>${store.domain}</strong></p>
-      <a href="/admin?store=${store.domain}">ادخل إلى لوحة التحكم</a>
+      <p>Access Token: <code>${access_token}</code></p>
+      <p>Refresh Token: <code>${refresh_token}</code></p>
+      <p>Expires In: ${expires_in} seconds</p>
     `);
 
   } catch (error) {
-    console.error('❌ خطأ في استلام التوكن:', error.message || error);
+    console.error('❌ خطأ في استلام التوكن:', error.response?.body || error.message);
     res.status(500).send('حدث خطأ أثناء التثبيت. تحقق من السجلات.');
   }
 });
