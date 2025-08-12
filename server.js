@@ -25,15 +25,12 @@ app.use(express.json({
 
 // لو جاء body كنص (بعض أدوات ويندوز)، حوّله JSON
 app.use((req, res, next) => {
-  // PowerShell أحيانًا يرسل بدون charset أو كـ نص
   if (!req.body || typeof req.body === 'string') {
     try {
       if (typeof req.body === 'string' && req.body.trim().startsWith('{')) {
         req.body = JSON.parse(req.body);
       }
-    } catch (e) {
-      // لو فشل التحويل، نكمل؛ المسار نفسه بيتحقق من الحقول ويعطي رسالة واضحة
-    }
+    } catch (_) {}
   }
   next();
 });
@@ -66,27 +63,58 @@ const supabaseAdmin  = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE); // ل�
 // ----- OAuth with Zid -----
 app.get('/install', (req, res) => {
   if (!CLIENT_ID || !REDIRECT_URI) return res.status(500).send('❌ إعدادات OAuth ناقصة.');
-  const authUrl = `https://oauth.zid.sa/oauth/authorize?client_id=${encodeURIComponent(CLIENT_ID)}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=read_write`;
-  res.send(`<h2>تثبيت تطبيق المدونة</h2><a href="${authUrl}"><button style="padding:10px 20px;font-size:16px">تثبيت التطبيق</button></a>`);
+  const authUrl =
+    `https://oauth.zid.sa/oauth/authorize` +
+    `?client_id=${encodeURIComponent(CLIENT_ID)}` +
+    `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
+    `&response_type=code&scope=read_write`;
+  res.send(`<h2>تثبيت تطبيق المدونة</h2>
+    <a href="${authUrl}"><button style="padding:10px 20px;font-size:16px">تثبيت التطبيق</button></a>`);
 });
 
+// ✅ التعديل هنا: إعادة توجيه تلقائي لو ما فيه code
 app.get('/auth/callback', async (req, res) => {
   const { code } = req.query;
-  if (!code) return res.status(400).send('❌ لا يوجد كود تفويض');
+
+  if (!code) {
+    const authUrl =
+      `https://oauth.zid.sa/oauth/authorize` +
+      `?client_id=${encodeURIComponent(CLIENT_ID)}` +
+      `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
+      `&response_type=code&scope=read_write`;
+    return res.redirect(authUrl);
+  }
+
+  if (!CLIENT_ID || !CLIENT_SECRET || !REDIRECT_URI) {
+    return res.status(500).send('❌ إعدادات OAuth ناقصة. تحقق من CLIENT_ID/CLIENT_SECRET/REDIRECT_URI.');
+  }
+
   try {
     const tokenRes = await got.post('https://oauth.zid.sa/oauth/token', {
-      form: { grant_type:'authorization_code', client_id:CLIENT_ID, client_secret:CLIENT_SECRET, code, redirect_uri:REDIRECT_URI },
-      responseType:'json', throwHttpErrors:false
+      form: {
+        grant_type: 'authorization_code',
+        client_id: CLIENT_ID,
+        client_secret: CLIENT_SECRET,
+        code,
+        redirect_uri: REDIRECT_URI,
+      },
+      responseType: 'json',
+      throwHttpErrors: false,
     });
+
     if (tokenRes.statusCode >= 400) {
-      console.error('Token exchange failed:', tokenRes.statusCode, tokenRes.body);
-      return res.status(500).send('❌ فشل جلب التوكن من زد.');
+      console.error('❌ Token exchange failed:', tokenRes.statusCode, tokenRes.body);
+      return res.status(500).send(`❌ فشل جلب التوكن من زد. الكود: ${tokenRes.statusCode}`);
     }
-    // TODO: احفظ access_token و store_id لاحقًا
-    res.send(`<h3>✅ تم التثبيت بنجاح!</h3><p><a href="/admin">لوحة التحكم</a> • <a href="/blog">عرض المدونة</a></p>`);
-  } catch (e) {
-    console.error('OAuth error:', e?.response?.body || e.message);
-    res.status(500).send('❌ حدث خطأ أثناء التثبيت.');
+
+    // TODO: خزّن access_token و store_id لاحقًا
+    return res.send(`
+      <h3>✅ تم التثبيت بنجاح!</h3>
+      <p>الآن تقدر تدخل <a href="/admin">لوحة التحكم</a> أو <a href="/blog">عرض المدونة</a>.</p>
+    `);
+  } catch (err) {
+    console.error('❌ خطأ أثناء طلب التوكن:', err?.response?.body || err.message);
+    return res.status(500).send('❌ حدث خطأ أثناء التثبيت. تحقق من السجلات.');
   }
 });
 
@@ -117,14 +145,11 @@ app.get('/blog-data', async (req, res) => {
 // Create post (writes via service role)
 app.post('/api/posts', async (req, res) => {
   try {
-    // لو الـ body وصل كنص خام أو بدون JSON
     if (!req.body || typeof req.body !== 'object') {
       return res.status(400).json({ error: 'الحقول title و content و store_id مطلوبة (JSON body)' });
     }
 
     let { title, content, store_id } = req.body;
-
-    // تأكيد أنها نصوص (وتحويل آمن للي يجي بشكل غير متوقع)
     const toUtf8 = (v) => (typeof v === 'string' ? Buffer.from(v, 'utf8').toString('utf8') : v);
     title = toUtf8(title);
     content = toUtf8(content);
@@ -158,7 +183,9 @@ app.get('/admin', (req, res) => {
   res.sendFile(existing);
 });
 
-app.get('/', (req, res) => res.send('<h1>Faisal Blog</h1><a href="/blog">المدونة</a> • <a href="/admin">لوحة التحكم</a> • <a href="/install">تثبيت</a>'));
+app.get('/', (req, res) =>
+  res.send('<h1>Faisal Blog</h1><a href="/blog">المدونة</a> • <a href="/admin">لوحة التحكم</a> • <a href="/install">تثبيت</a>')
+);
 
 app.get('/test', (req, res) => {
   res.json({
