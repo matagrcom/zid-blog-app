@@ -13,8 +13,31 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+
+// ----- Middlewares -----
 app.use(cors());
-app.use(express.json());
+
+// إجبار معالجة JSON على UTF-8 + حجم معقول
+app.use(express.json({
+  limit: '2mb',
+  type: ['application/json', 'application/*+json']
+}));
+
+// لو جاء body كنص (بعض أدوات ويندوز)، حوّله JSON
+app.use((req, res, next) => {
+  // PowerShell أحيانًا يرسل بدون charset أو كـ نص
+  if (!req.body || typeof req.body === 'string') {
+    try {
+      if (typeof req.body === 'string' && req.body.trim().startsWith('{')) {
+        req.body = JSON.parse(req.body);
+      }
+    } catch (e) {
+      // لو فشل التحويل، نكمل؛ المسار نفسه بيتحقق من الحقول ويعطي رسالة واضحة
+    }
+  }
+  next();
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ----- Env -----
@@ -37,10 +60,8 @@ const SUPABASE_SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE;
 
 // ----- Supabase clients -----
 const BLOG_TABLE = 'zid_blog_posts';
-// للقراءة العامّة (RLS و anon)
-const supabasePublic = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-// للكتابة (يتجاوز RLS)
-const supabaseAdmin  = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE);
+const supabasePublic = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);     // للقراءة
+const supabaseAdmin  = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE); // للكتابة (يتجاوز RLS)
 
 // ----- OAuth with Zid -----
 app.get('/install', (req, res) => {
@@ -95,12 +116,38 @@ app.get('/blog-data', async (req, res) => {
 
 // Create post (writes via service role)
 app.post('/api/posts', async (req, res) => {
-  const { title, content, store_id } = req.body || {};
-  if (!title || !content || !store_id) return res.status(400).json({ error: 'الحقول title و content و store_id مطلوبة' });
-  const { data, error } = await supabaseAdmin
-    .from(BLOG_TABLE).insert([{ title, content, store_id, created_at: new Date() }]);
-  if (error) return res.status(500).json({ error: error.message });
-  res.json({ success: true, data });
+  try {
+    // لو الـ body وصل كنص خام أو بدون JSON
+    if (!req.body || typeof req.body !== 'object') {
+      return res.status(400).json({ error: 'الحقول title و content و store_id مطلوبة (JSON body)' });
+    }
+
+    let { title, content, store_id } = req.body;
+
+    // تأكيد أنها نصوص (وتحويل آمن للي يجي بشكل غير متوقع)
+    const toUtf8 = (v) => (typeof v === 'string' ? Buffer.from(v, 'utf8').toString('utf8') : v);
+    title = toUtf8(title);
+    content = toUtf8(content);
+    store_id = toUtf8(store_id);
+
+    if (!title || !content || !store_id) {
+      return res.status(400).json({ error: 'الحقول title و content و store_id مطلوبة' });
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from(BLOG_TABLE)
+      .insert([{ title, content, store_id, created_at: new Date() }]);
+
+    if (error) {
+      console.error('Supabase insert error:', error);
+      return res.status(500).json({ error: error.message || 'Supabase insert failed' });
+    }
+
+    res.json({ success: true, data });
+  } catch (e) {
+    console.error('POST /api/posts error:', e);
+    res.status(500).json({ error: e?.message || 'Unexpected server error' });
+  }
 });
 
 // Admin page
