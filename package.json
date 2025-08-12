@@ -1,7 +1,7 @@
 {
-  "name": "zid-blog-app",
+  "name": "faisal-blog",
   "version": "1.0.0",
-  "description": "تطبيق مدونة لمتجر زد",
+  "description": "Faisal Blog - تطبيق مدونة لمتجر زد",
   "main": "server.js",
   "type": "module",
   "scripts": {
